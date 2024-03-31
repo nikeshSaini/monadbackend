@@ -1,7 +1,23 @@
 const userDetails =require("../models/userDetails");
 const WorkSession = require("../models/worksession");
 var session = require('express-session');
+const jwt = require("jsonwebtoken");
+secret = "monad@9536";
 
+function setUser(user){
+
+    return jwt.sign({
+        _id:user._id,
+        email:user.email,
+        
+    },secret,{ expiresIn: '1h' });
+
+}
+
+function getUser(token){
+  if(!token) return null;
+  return jwt.verify(token,secret);
+}
 
 
 
@@ -9,7 +25,7 @@ async function handleGetLogin(req,res){
     const { email, password } = req.body;
     try {
       const userCred = await userDetails.findOne({ email });
-  
+
       if (!userCred) {
         return res.status(404).json({ message: "User not found" });
       }
@@ -17,12 +33,15 @@ async function handleGetLogin(req,res){
       if (userCred.password !== password) {
         return res.status(401).json({ message: "Incorrect password" });
       }
-  
-      req.session.userCred = userCred; // Storing the object userCred in session
-      res.status(200).json({msg:"login successful"});
+
+      
+      const token =  setUser(userCred);
+      res.cookie("token", token, { httpOnly: true, secure: true, sameSite: "strict" });
+
+      res.status(200).json({msg:"login successful",isvalid:"true"});
 
     } catch(error) {
-      res.status(500).json({ message: "Internal server error" });
+      res.status(500).json({ message: "Internal server error" ,error});
     }
 }
 

@@ -73,6 +73,9 @@ app.post("/api/users/expenseform", upload.single('img'), async (req, res) => {
   }
 });
 
+
+
+
   
  
   
@@ -106,104 +109,84 @@ app.post("/api/users/expenseform", upload.single('img'), async (req, res) => {
   
   // //post data after submiting the form
   
-  // app.post('/start', async (req, res) => {
-  //   try {
-  //     // Create a new work session document with the starting time and location
-  //     const sessionData = req.body.session;
-  //     const latitude = req.body.latitude;
-  //     const longitude = req.body.longitude;
-
-  //     if (!sessionData.userId || isNaN(latitude) || isNaN(longitude)) {
-  //       // Respond with a bad request status if required data is missing or invalid
-  //       return res.status(400).json({ message: 'Missing or invalid required fields.' });
-  //     }
-  
-  //     const newWorkSession = new WorkSession({
-  //       userId: sessionData.userId,
-  //       startTime: new Date(),
-  //       location: {
-  //         type: 'Point',
-  //         coordinates: [longitude, latitude] // Note: longitude first, then latitude
-  //       }
-  //     });
-  
-  //     // Save the document to the database
-  //     await newWorkSession.save();
-      
-  //     res.json({ message: 'Starting time recorded successfully.' });
-  //   } catch (error) {
-  //     console.error('Error recording starting time:', error);
-  //     res.status(500).json({ message: 'Error recording starting time.' });
-  //   }
-  // });
-  
-
-  // app.post('/end', async (req, res) => {
-  //   try {
-  //     // Find the latest work session and update its ending time
-  //     const sessionData =req.body.session;
-
-  //     const latestSession = await WorkSession.findOne().sort({startTime: -1});
-
-  //     if (!latestSession) {
-  //       return res.status(404).json({ message: 'No active work session found.' });
-  //     }
-
-  //     latestSession.endTime = new Date();
-
-  //     await latestSession.save();
-  //     res.json({ message: 'Ending time recorded successfully.' });
-
-  //   } catch (error) {
-  //     console.error('Error recording ending time:', error);
-  //     res.status(500).json({ message: 'Error recording ending time.' });
-  //   }
-  // });
-  
-
-  
-
-  app.get("/userlist", async (req, res) => {
+  app.post('/api/users/start', async (req, res) => {
     try {
-        // Fetch user details from the database
-        const userList = await UserDetails.find({});
-        
-        // Check if any users were found
-        if (!userList || userList.length === 0) {
-            return res.status(404).json({ message: "No users found." });
+      // Create a new work session document with the starting time and location
+      const sessionData = req.body.session;
+      const latitude = req.body.latitude;
+      const longitude = req.body.longitude;
+
+      if (!sessionData.userId || isNaN(latitude) || isNaN(longitude)) {
+        // Respond with a bad request status if required data is missing or invalid
+        return res.status(400).json({ message: 'Missing or invalid required fields.' });
+      }
+  
+      const newWorkSession = new WorkSession({
+        userId: sessionData.userId,
+        startTime: new Date(),
+        location: {
+          type: 'Point',
+          coordinates: [longitude, latitude] // Note: longitude first, then latitude
         }
-        
-        // Send the user list data as JSON
-        res.status(200).json({ userList });
+      });
+  
+      // Save the document to the database
+      await newWorkSession.save();
+      
+      res.json({ message: 'Starting time recorded successfully.' });
     } catch (error) {
-        // Handle errors
-        console.error("Error fetching user list:", error);
-        res.status(500).json({ error: "Error fetching user list" });
+      console.error('Error recording starting time:', error);
+      res.status(500).json({ message: 'Error recording starting time.' });
     }
-});
-
-
-
-  
-
-  
-  
-  
-  
-  
-  
-  
-  
-  //login credential post route
-  app.post("/login", async(req,res)=>{
-    
   });
   
+
+  app.post('/api/users/end', async (req, res) => {
+    try {
+      // Find the latest work session and update its ending time
+      const sessionData =req.body.session;
+
+      const latestSession = await WorkSession.findOne().sort({startTime: -1});
+
+      if (!latestSession) {
+        return res.status(404).json({ message: 'No active work session found.' });
+      }
+
+      latestSession.endTime = new Date();
+
+      await latestSession.save();
+      res.json({ message: 'Ending time recorded successfully.' });
+
+    } catch (error) {
+      console.error('Error recording ending time:', error);
+      res.status(500).json({ message: 'Error recording ending time.' });
+    }
+  });
   
+
   
-  
-  // Logout route
-  app.get("/logout", (req, res) => {
+
+//   app.get("/userlist", async (req, res) => {
+//     try {
+//         // Fetch user details from the database
+//         const userList = await UserDetails.find({});
+        
+//         // Check if any users were found
+//         if (!userList || userList.length === 0) {
+//             return res.status(404).json({ message: "No users found." });
+//         }
+        
+//         // Send the user list data as JSON
+//         res.status(200).json({ userList });
+//     } catch (error) {
+//         // Handle errors
+//         console.error("Error fetching user list:", error);
+//         res.status(500).json({ error: "Error fetching user list" });
+//     }
+// });
+
+
+  app.get("/api/users/logout", (req, res) => {
     // Clear the session
     req.session.destroy((err) => {
       if (err) {
@@ -327,7 +310,7 @@ app.post("/api/users/expenseform", upload.single('img'), async (req, res) => {
   })
   
   // app.get('/location',(req,res)=>{
-  //   res.render('getcurrent.ejs');
+  //   res.render('getcurrent.ejs'); 
   // })
   app.listen(port, (req, res)=>{
       console.log("app is listening" + port);
