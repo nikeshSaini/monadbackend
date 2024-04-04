@@ -66,217 +66,193 @@ app.post("/api/users/expenseform", upload.single('img'), async (req, res) => {
 
     await feedbackItem.save();
 
-    res.status(201).json({ message: "Expenses saved successfully", feedbackItem });
+    res.status(201).json({ msg: "Expenses saved successfully", status: true });
   } catch (error) {
     console.error("Error saving Expense form:", error);
-    res.status(500).send("Error saving ExpenseForm: " + error.message);
+    res.status(500).json({ error: `Error saving ExpenseForm: ${error.message}`, status: true });
+
+  }
+});
+
+
+ //post data after submiting the form
+  
+ app.post('/api/users/start', async (req, res) => {
+  try {
+    // Create a new work session document with the starting time and location
+    const sessionData = req.body.session;
+    const latitude = req.body.latitude;
+    const longitude = req.body.longitude;
+
+    if (!sessionData.userId || isNaN(latitude) || isNaN(longitude)) {
+      // Respond with a bad request status if required data is missing or invalid
+      return res.status(400).json({ message: 'Missing or invalid required fields.' });
+    }
+
+    const newWorkSession = new WorkSession({
+      userId: sessionData.userId,
+      startTime: new Date(),
+      location: {
+        type: 'Point',
+        coordinates: [longitude, latitude] // Note: longitude first, then latitude
+      }
+    });
+
+    // Save the document to the database
+    await newWorkSession.save();
+    
+    res.status(202).json({ message: 'Starting time recorded successfully.',status: true });
+  } catch (error) {
+    console.error('Error recording starting time:', error);
+    res.status(500).json({ message: 'Error recording starting time.',status: false });
+  }
+});
+
+
+app.post('/api/users/end', async (req, res) => {
+  try {
+    // Find the latest work session and update its ending time
+    const sessionData =req.body.session;
+    const latestSession = await WorkSession.findOne().sort({startTime: -1});
+
+    if (!latestSession) {
+      return res.status(404).json({ message: 'No active work session found.' });
+    }
+
+    latestSession.endTime = new Date();
+
+    await latestSession.save();
+    res.json({ message: 'Ending time recorded successfully.' ,status: true});
+
+  } catch (error) {
+    console.error('Error recording ending time:', error);
+    res.status(500).json({ message: 'Error recording ending time.' ,status: false});
+  }
+});
+
+
+  
+ 
+  
+  //attendance page route for user
+  app.get('/api/users/view/attendance', async (req, res) => {
+    const userCred = req.session.userCred; // Retrieving userCred from session
+    if (!userCred) {
+        return res.json({ status: false, msg: "No user Found" }); // Return error if not authenticated
+    }
+    
+    try {
+        const currId = userCred._id;
+        const worksession = await WorkSession.find({ userId: currId }).sort({ startTime: 1 });
+        res.json({ worksession, status: true });
+    } catch (error) {
+        console.error("Error fetching attendance:", error); // Log the error for server-side inspection
+        res.status(500).json({ status: false, msg: "Failed to fetch attendance records" });
+    }
+});
+
+ //feedback view for user
+ app.get('/api/users/view/feedback', (req, res) => {
+  try {
+      const userCred = req.session.userCred; // Retrieving userCred from session
+      if (!userCred) {
+          // Instead of redirecting, respond with an error message in JSON format
+          return res.json({ msg: 'Please login to view feedback', status: false });
+      }
+
+      // If the user is authenticated, proceed to send the feedback data
+      // For demonstration, sending back userCred, in a real scenario, you'd query feedback data
+      res.json({ data: userCred, status: true });
+  } catch (error) {
+      // Log the error for debugging purposes
+      console.error("Error while accessing feedback:", error);
+      // Respond with a generic server error message
+      res.status(500).json({ msg: "An error occurred while retrieving feedback", status: false });
   }
 });
 
 
 
 
-  
- 
-  
-  
-  
- 
-  
-  // app.get("/userPreview", async (req, res) => {
-  //   try {
-  //     // Fetch all user details from the database
-  //     const users = await userDetails.find({});
-  
-  //     // Check if users exist
-  //     if (users.length === 0) {
-  //       // Optionally, render a specific view if no users are found,
-  //       // or pass a message to the same view indicating no users were found.
-  //       // This depends on your application's design and user experience strategy.
-  //       return res.render("userPreview", { message: "No users found" });
-  //     }
-  
-  //     // Render the 'userPreview' view, passing the list of users
-  //     res.render("userPreview", { listings: users });
-  //   } catch (error) {
-  //     console.error("Error fetching user details:", error);
-  //     // Render an error view or pass an error message to an existing view.
-  //     // Adjust the implementation based on how you want to handle and display errors.
-  //     res.status(500).render("errorView", { error: "Error fetching user details" });
-  //   }
-  // });
-  
-  
-  // //post data after submiting the form
-  
-  app.post('/api/users/start', async (req, res) => {
-    try {
-      // Create a new work session document with the starting time and location
-      const sessionData = req.body.session;
-      const latitude = req.body.latitude;
-      const longitude = req.body.longitude;
-
-      if (!sessionData.userId || isNaN(latitude) || isNaN(longitude)) {
-        // Respond with a bad request status if required data is missing or invalid
-        return res.status(400).json({ message: 'Missing or invalid required fields.' });
-      }
-  
-      const newWorkSession = new WorkSession({
-        userId: sessionData.userId,
-        startTime: new Date(),
-        location: {
-          type: 'Point',
-          coordinates: [longitude, latitude] // Note: longitude first, then latitude
-        }
-      });
-  
-      // Save the document to the database
-      await newWorkSession.save();
-      
-      res.json({ message: 'Starting time recorded successfully.' });
-    } catch (error) {
-      console.error('Error recording starting time:', error);
-      res.status(500).json({ message: 'Error recording starting time.' });
-    }
-  });
-  
-
-  app.post('/api/users/end', async (req, res) => {
-    try {
-      // Find the latest work session and update its ending time
-      const sessionData =req.body.session;
-
-      const latestSession = await WorkSession.findOne().sort({startTime: -1});
-
-      if (!latestSession) {
-        return res.status(404).json({ message: 'No active work session found.' });
-      }
-
-      latestSession.endTime = new Date();
-
-      await latestSession.save();
-      res.json({ message: 'Ending time recorded successfully.' });
-
-    } catch (error) {
-      console.error('Error recording ending time:', error);
-      res.status(500).json({ message: 'Error recording ending time.' });
-    }
-  });
-  
-
-  
-
-//   app.get("/userlist", async (req, res) => {
-//     try {
-//         // Fetch user details from the database
-//         const userList = await UserDetails.find({});
-        
-//         // Check if any users were found
-//         if (!userList || userList.length === 0) {
-//             return res.status(404).json({ message: "No users found." });
-//         }
-        
-//         // Send the user list data as JSON
-//         res.status(200).json({ userList });
-//     } catch (error) {
-//         // Handle errors
-//         console.error("Error fetching user list:", error);
-//         res.status(500).json({ error: "Error fetching user list" });
-//     }
-// });
-
-
-  app.get("/api/users/logout", (req, res) => {
-    // Clear the session
-    req.session.destroy((err) => {
-      if (err) {
-        console.error("Error destroying session:", err);
-        res.status(500).send("Error destroying session");
-      } else {
-        // Redirect the user to the login page after logout
-        res.redirect("/login");
-      }
-    });
-  });
-  
-  
-  // Default route
-  app.get('/', (req, res) => {
-    // Check if user is logged in (userCred exists in session)
-    if (req.session.userCred) {
-      // User is logged in, render the landing page
-      res.render("landingPage.ejs", { userCred: req.session.userCred });
+app.get("/api/users/logout", (req, res) => {
+  // Clear the session
+  req.session.destroy((err) => {
+    if (err) {
+      console.error("Error destroying session:", err);
+      res.status(500).send("Error destroying session");
     } else {
-      // User is not logged in, render the login page
-      res.render("login.ejs");
+      // Redirect the user to the login page after logout
+      res.redirect("/login");
     }
   });
+});
+
   
-  
-  //login route
-  
-  app.get("/login" ,(req, res)=>{
-    res.render("login.ejs");
-  })
-  
-  
-  //login user landing page
-  app.get('/user', (req, res) => {
-    const userCred = req.session.userCred; // Retrieving userCred from session
-    if (!userCred) {
-        return res.redirect('/login'); // Redirect to login if not authenticated
+
+
+
+
+
+
+
+
+
+//for admin to fetch list of users
+  app.get("/api/admin/view/userslist", async (req, res) => {
+    try {
+        // Fetch user details from the database
+        const userList = await UserDetails.find({});
+        
+        // Check if any users were found
+        if (!userList || userList.length === 0) {
+            return res.status(404).json({ message: "No users found." });
+        }
+        
+        // Send the user list data as JSON
+        res.status(200).json({ userList , status: true});
+    } catch (error) {
+        // Handle errors
+        console.error("Error fetching user list:", error);
+        res.status(500).json({ error: "Error fetching user list",status: false });
     }
-    res.render("landingPage.ejs", { userCred });
-  });
-  //admin login
-  
-  app.get("/adminlogin",(req,res)=>{
-    res.render("adminLogin.ejs");
-  })
-  // /register
-  app.get("/register", (req,res)=>{
-    res.render("userForm.ejs");
-  });
+});
+
+
+
+
   
   
+ 
+
   
-  //feedback
-  
-  app.get('/feedback', (req, res) => {
-    const userCred = req.session.userCred; // Retrieving userCred from session
-    if (!userCred) {
-        return res.redirect('/login'); // Redirect to login if not authenticated
-    }
-    res.render('index', { userCred });
-  });
-  
-  //preview feedback
-  app.get('/view/feedback', async(req,res)=>{
-    const userCred = req.session.userCred; // Retrieving userCred from session
-    if (!userCred) {
-      return res.redirect('/login'); // Redirect to login if not authenticated
-    }
-    const currId =userCred._id;
-    const currUserName = userCred.fullName;
-    const feedbacks = await Listing.find({userId : currId});
-    res.render("showFeedback.ejs",{feedbacks,currUserName});
-  }); 
+ 
   //feedback via admin
-  app.get('/view/feedback/:id', async (req, res) => {
+  app.get('/api/admin/view/feedback/:id', async (req, res) => {
     try {
       const { id } = req.params;
       const user = await userDetails.findById(id); // Assuming userDetails is your user model
+      if (!user) {
+        // If no user is found with the provided ID
+        return res.status(404).json({ message: "User not found", status: false });
+      }
       const currUserName = user.fullName;
-      const feedbacks = await Listing.find({ userId: id }); 
-      res.render("showFeedback", { feedbacks, currUserName });
+      const feedbacks = await Expense.find({ userId: id });
+  
+      // Check if feedback exists
+      if (feedbacks.length === 0) {
+        return res.status(404).json({ message: "No feedback found for the user", status: false });
+      }
+  
+      res.json({ feedbacks, currUserName, status: true });
     } catch (error) {
       console.error("Error fetching feedback:", error);
-      res.status(500).send("Error fetching feedback");
+      res.status(500).json({ message: "Error fetching feedback", status: false });
     }
   });
   
+  
   //attendance via admin
-  app.get('/view/attendance/:id', async (req, res) => {
+  app.get('api/admin/view/attendance/:id', async (req, res) => {
     try {
       const { id } = req.params;
       const user = await userDetails.findById(id); // Assuming userDetails is your user model
@@ -284,30 +260,18 @@ app.post("/api/users/expenseform", upload.single('img'), async (req, res) => {
   
       const worksession = await WorkSession.find({ userId: id }); // Assuming userId field is used to identify the user in the WorkSession model
   
-      res.render("adminpreview", { worksession, currUserName });
+      res.json({ worksession, currUserName , status: true});
     } catch (error) {
       console.error("Error fetching work session:", error);
-      res.status(500).send("Error fetching work session");
+      res.status(500).json({msg:"Error fetching work session", status: false});
     }
   });
   
+ 
   
   
-  //attendance page route
-  app.get('/view/attendance', async(req,res)=>{
-    const userCred = req.session.userCred; // Retrieving userCred from session
-    if (!userCred) {
-      return res.redirect('/login'); // Redirect to login if not authenticated
-    }
-    const currId =userCred._id;
-    const worksession = await WorkSession.find({ userId: currId }).sort({ startTime: 1 });
-    res.render("preview.ejs",{worksession});
-  }); 
   
-  app.get('/attendance',(req,res)=>{
-    const userCred = req.session.userCred;// Retrieving userCred from session
-    res.render('showattendance.ejs',{userCred});
-  })
+
   
   // app.get('/location',(req,res)=>{
   //   res.render('getcurrent.ejs'); 

@@ -38,10 +38,10 @@ async function handleGetLogin(req,res){
       const token =  setUser(userCred);
       res.cookie("token", token, { httpOnly: true, secure: true, sameSite: "strict" });
 
-      res.status(200).json({msg:"login successful",isvalid:"true"});
+      res.status(200).json({msg:"login successful",isvalid:"true", data: userCred, status: true});
 
     } catch(error) {
-      res.status(500).json({ message: "Internal server error" ,error});
+      res.status(500).json({ message: "Internal server error" ,error, status: false});
     }
 }
 
@@ -61,11 +61,12 @@ async function handleUserSignup(req,res){
     
         // Save the new user to the database
         const savedUser = await newUser.save();
-        res.status(201).json({ message: 'User registered successfully'});
+        res.status(201).json({ message: 'User registered successfully',status: true});
         
       } catch (error) {
         console.error('Error registering user:', error);
-        res.status(500).json(`${ error}`);
+        res.status(500).json({ error: error, status: false });
+
       }
 }
 
