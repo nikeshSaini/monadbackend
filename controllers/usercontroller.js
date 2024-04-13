@@ -1,4 +1,5 @@
 const userDetails =require("../models/userDetails");
+const Expense =require('../models/expenseform')
 const WorkSession = require("../models/worksession");
 var session = require('express-session');
 const jwt = require("jsonwebtoken");
@@ -85,6 +86,17 @@ async function handleUserSignup(req,res){
 //     }
 // }
 
+const getUserProfile =async(req,res)=>{
+  const userId=req.params.userId
+ const theUser=await userDetails.findById(userId).lean()
+ if(!theUser){
+  res.status(400).json({status:false,message:"user not found"})
+ }else{
+  const theExp=await Expense.find({userId:userId})
+  theUser.userExpence=theExp
+  // console.log(theExp)
+  res.status(200).json({status:true,message:"data returned",data:theUser})
+ }
+}
 
-
-module.exports = {handleGetLogin,handleUserSignup,}
+module.exports = {handleGetLogin,handleUserSignup,getUserProfile}
