@@ -4,7 +4,7 @@ const WorkSession = require("../models/worksession");
 var session = require('express-session');
 const jwt = require("jsonwebtoken");
 secret = "monad@9536";
-
+const jwt = require('jsonwebtoken')
 function setUser(user){
 
     return jwt.sign({
@@ -38,8 +38,10 @@ async function handleGetLogin(req,res){
       
       const token =  setUser(userCred);
       res.cookie("token", token, { httpOnly: true, secure: true, sameSite: "strict" });
-
-      res.status(200).json({msg:"login successful",isvalid:"true", data: userCred, status: true});
+      jwt.sign({ user: userCred }, process.env.JWT_SECRET_KEY, (err, token) => {
+        return res.status(200).json({msg:"login successful",isvalid:"true", token:token, data: userCred, status: true});
+    });
+      
 
     } catch(error) {
       res.status(500).json({ message: "Internal server error" ,error, status: false});
@@ -54,7 +56,7 @@ async function handleUserSignup(req,res){
         const userData = req.body.userData;
     
         // Create a new user document
-        const newUser = new userDetails({
+        const newUser =await new userDetails({
           fullName: userData.fullName,
           email: userData.email,
           password: userData.password,
@@ -62,7 +64,10 @@ async function handleUserSignup(req,res){
     
         // Save the new user to the database
         const savedUser = await newUser.save();
-        res.status(201).json({ message: 'User registered successfully',status: true});
+        jwt.sign({ user: newUser }, process.env.JWT_SECRET_KEY, (err, token) => {
+          return res.status(201).json({ message: 'User registered successfully',token:token,status: true});
+      });
+        
         
       } catch (error) {
         console.error('Error registering user:', error);

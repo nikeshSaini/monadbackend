@@ -1,6 +1,6 @@
 const express = require("express");
 const userRouter = express.Router();
-
+const verifyToken=require("../middleware/auth")
 const {
   handleGetLogin,
   handleUserSignup,
@@ -9,11 +9,11 @@ const {
 } = require("../controllers/usercontroller");
 
 
-userRouter.route("/")
-          .get(handleGetLogin)
-          .post(handleUserSignup); 
+userRouter.get("/",handleGetLogin)
+userRouter.post("/",handleUserSignup)
+         
           //its working as goood
-userRouter.get("/get-user-details",getUserProfile)
+userRouter.get("/get-user-details",verifyToken,getUserProfile)
         
 
 
