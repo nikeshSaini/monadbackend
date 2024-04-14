@@ -8,11 +8,16 @@ const app = express();
 const adminRoute =require("./routes/admin.js");
 const userRouter = require("./routes/user.js");
 const {mongodbConnection,} = require("./connection.js");
+const cookieParser = require('cookie-parser');
+const jwt = require('jsonwebtoken')
+const WorkSession = require('./models/worksession.js')
+
 const port = process.env.PORT ;
 //model import
 const Expense = require("./models/expenseform.js");
 
 //middlewares
+app.use(cookieParser());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, "public")));
 app.use(session({
@@ -49,11 +54,14 @@ app.post("/api/users/expenseform", upload.single('img'), async (req, res) => {
     if (!req.file) {
       throw new Error("No file uploaded");
     }
+    const token = req.cookies.token;
+    const decodedToken = jwt.verify(token, process.env.JWT_SECRET_KEY);
+    const userId = decodedToken.userId;
 
     const feedbackData = req.body.expense;
     const img = req.file.filename;
     const feedbackItem = new Expense({
-        userId: feedbackData.userId,
+        userId:userId,
         description: feedbackData.description,
         location: feedbackData.location,
         local: feedbackData.local,
@@ -69,66 +77,86 @@ app.post("/api/users/expenseform", upload.single('img'), async (req, res) => {
     res.status(201).json({ msg: "Expenses saved successfully", status: true });
   } catch (error) {
     console.error("Error saving Expense form:", error);
-    res.status(500).json({ error: `Error saving ExpenseForm: ${error.message}`, status: true });
+    res.status(500).json({ error: `Error saving ExpenseForm: ${error.message}`, status: false });
 
   }
 });
 
 
  //post data after submiting the form
-  
+
  app.post('/api/users/start', async (req, res) => {
+   try {
+     // Create a new work session document with the starting time and location
+     const token = req.cookies.token;
+     let userId;
+ 
+     try {
+       const decodedToken = jwt.verify(token, process.env.JWT_SECRET_KEY);
+       userId = decodedToken.userId;
+     } catch (error) {
+       console.error('Token verification error:', error);
+       return res.status(403).json({ message: 'Invalid or expired token.', status: false });
+     }
+ 
+     const latitude = req.body.latitude;
+     const longitude = req.body.longitude;
+ 
+     if (!userId || isNaN(latitude) || isNaN(longitude)) {
+       // Respond with a bad request status if required data is missing or invalid
+       return res.status(400).json({ message: 'Missing or invalid required fields.' });
+     }
+ 
+     const newWorkSession = new WorkSession({
+       userId: userId,
+       startTime: new Date(),
+       location: {
+         type: 'Point',
+         coordinates: [longitude, latitude] // Note: longitude first, then latitude
+       }
+     });
+ 
+     // Save the document to the database
+     await newWorkSession.save();
+     
+     res.status(202).json({ message: 'Starting time recorded successfully.', status: true });
+   } catch (error) {
+     console.error('Error recording starting time:', error);
+     res.status(500).json({ message: 'Error recording starting time.', status: false });
+   }
+ });
+ 
+
+ app.post('/api/users/end', async (req, res) => {
   try {
-    // Create a new work session document with the starting time and location
-    const sessionData = req.body.session;
-    const latitude = req.body.latitude;
-    const longitude = req.body.longitude;
+    // Verify token and extract user ID
+    const token = req.cookies.token;
+    const decodedToken = jwt.verify(token, process.env.JWT_SECRET_KEY);
+    const userId = decodedToken.userId;
 
-    if (!sessionData.userId || isNaN(latitude) || isNaN(longitude)) {
-      // Respond with a bad request status if required data is missing or invalid
-      return res.status(400).json({ message: 'Missing or invalid required fields.' });
-    }
-
-    const newWorkSession = new WorkSession({
-      userId: sessionData.userId,
-      startTime: new Date(),
-      location: {
-        type: 'Point',
-        coordinates: [longitude, latitude] // Note: longitude first, then latitude
-      }
-    });
-
-    // Save the document to the database
-    await newWorkSession.save();
-    
-    res.status(202).json({ message: 'Starting time recorded successfully.',status: true });
-  } catch (error) {
-    console.error('Error recording starting time:', error);
-    res.status(500).json({ message: 'Error recording starting time.',status: false });
-  }
-});
-
-
-app.post('/api/users/end', async (req, res) => {
-  try {
-    // Find the latest work session and update its ending time
-    const sessionData =req.body.session;
-    const latestSession = await WorkSession.findOne().sort({startTime: -1});
+    // Find the latest work session for the current user
+    const latestSession = await WorkSession.findOne({ userId }).sort({ startTime: -1 });
 
     if (!latestSession) {
-      return res.status(404).json({ message: 'No active work session found.' });
+      return res.status(404).json({ message: 'No active work session found for the current user.' });
     }
 
+    // Update the ending time of the latest session to the current time
     latestSession.endTime = new Date();
 
+    // Save the changes to the session
     await latestSession.save();
-    res.json({ message: 'Ending time recorded successfully.' ,status: true});
+
+    // Return a success response
+    return res.json({ message: 'Ending time recorded successfully.', status: true });
 
   } catch (error) {
+    // Handle errors that may occur during the process
     console.error('Error recording ending time:', error);
-    res.status(500).json({ message: 'Error recording ending time.' ,status: false});
+    return res.status(500).json({ message: 'Error recording ending time.', status: false });
   }
 });
+
 
 
   
@@ -136,56 +164,69 @@ app.post('/api/users/end', async (req, res) => {
   
   //attendance page route for user
   app.get('/api/users/view/attendance', async (req, res) => {
-    const userCred = req.session.userCred; // Retrieving userCred from session
-    if (!userCred) {
-        return res.json({ status: false, msg: "No user Found" }); // Return error if not authenticated
-    }
-    
     try {
-        const currId = userCred._id;
-        const worksession = await WorkSession.find({ userId: currId }).sort({ startTime: 1 });
-        res.json({ worksession, status: true });
-    } catch (error) {
-        console.error("Error fetching attendance:", error); // Log the error for server-side inspection
-        res.status(500).json({ status: false, msg: "Failed to fetch attendance records" });
-    }
-});
-
- //feedback view for user
- app.get('/api/users/view/feedback', (req, res) => {
-  try {
-      const userCred = req.session.userCred; // Retrieving userCred from session
-      if (!userCred) {
-          // Instead of redirecting, respond with an error message in JSON format
-          return res.json({ msg: 'Please login to view feedback', status: false });
+      // Verify token and extract user ID
+      const token = req.cookies.token;
+      const decodedToken = jwt.verify(token, process.env.JWT_SECRET_KEY);
+      const userId = decodedToken.userId;
+  
+      // Return error if no user ID found
+      if (!userId) {
+        return res.json({ status: false, msg: "No user found." });
       }
+  
+      // Retrieve attendance records for the authenticated user
+      const attendanceRecords = await WorkSession.find({ userId }).sort({ startTime: 1 });
+  
+      // Return the attendance records in the response
+      return res.json({ attendanceRecords, status: true });
+    } catch (error) {
+      // Handle errors that may occur during the process
+      console.error("Error fetching attendance:", error);
+      return res.status(500).json({ status: false, msg: "Failed to fetch attendance records." });
+    }
+  });
+  
+ //feedback view for user
+ app.get('/api/users/view/feedback', async(req, res) => {
+  try {
+    // Verify token and extract user ID
+    const token = req.cookies.token;
+    const decodedToken = jwt.verify(token, process.env.JWT_SECRET_KEY);
+    const userId = decodedToken.userId;
 
-      // If the user is authenticated, proceed to send the feedback data
-      // For demonstration, sending back userCred, in a real scenario, you'd query feedback data
-      res.json({ data: userCred, status: true });
+    // If no user ID found, return an error message
+    if (!userId) {
+      return res.json({ msg: 'Please login to view feedback', status: false });
+    }
+
+    // Here, you'd query feedback data from your database based on the user ID
+    // For demonstration, let's assume you have a Feedback model and you query the data
+    // Replace the following line with your actual data retrieval logic
+    const feedbackData = await Feedback.find({ userId });
+
+    // Respond with the feedback data
+    return res.json({ data: feedbackData, status: true });
   } catch (error) {
-      // Log the error for debugging purposes
-      console.error("Error while accessing feedback:", error);
-      // Respond with a generic server error message
-      res.status(500).json({ msg: "An error occurred while retrieving feedback", status: false });
+    // Log the error for debugging purposes
+    console.error("Error while accessing feedback:", error);
+    // Respond with a generic server error message
+    return res.status(500).json({ msg: "An error occurred while retrieving feedback", status: false });
   }
 });
 
 
 
 
+
 app.get("/api/users/logout", (req, res) => {
-  // Clear the session
-  req.session.destroy((err) => {
-    if (err) {
-      console.error("Error destroying session:", err);
-      res.status(500).send("Error destroying session");
-    } else {
-      // Redirect the user to the login page after logout
-      res.redirect("/login");
-    }
-  });
+  // Clear the JWT token by removing it from the client-side
+  res.clearCookie("token"); // Clear the token cookie
+
+  // Redirect the user to the login page after logout
+  res.redirect("/");
 });
+
 
   
 

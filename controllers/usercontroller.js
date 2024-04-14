@@ -2,16 +2,14 @@ const userDetails =require("../models/userDetails");
 const Expense =require('../models/expenseform')
 const WorkSession = require("../models/worksession");
 var session = require('express-session');
-const jwt = require("jsonwebtoken");
-secret = "monad@9536";
 const jwt = require('jsonwebtoken')
 function setUser(user){
 
     return jwt.sign({
-        _id:user._id,
+        userId:user._id,
         email:user.email,
         
-    },secret,{ expiresIn: '1h' });
+    },process.env.JWT_SECRET_KEY,{ expiresIn: '24h' });
 
 }
 
