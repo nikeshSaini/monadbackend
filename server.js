@@ -11,10 +11,12 @@ const {mongodbConnection,} = require("./connection.js");
 const cookieParser = require('cookie-parser');
 const jwt = require('jsonwebtoken')
 const WorkSession = require('./models/worksession.js')
+const userDetails = require("./models/userDetails.js")
+const Expense = require("./models/expenseform.js");
+
 
 const port = process.env.PORT ;
 //model import
-const Expense = require("./models/expenseform.js");
 
 //middlewares
 app.use(cookieParser());
@@ -188,7 +190,7 @@ app.post("/api/users/expenseform", upload.single('img'), async (req, res) => {
   });
   
  //feedback view for user
- app.get('/api/users/view/feedback', async(req, res) => {
+ app.get('/api/users/view/expenseForm', async(req, res) => {
   try {
     // Verify token and extract user ID
     const token = req.cookies.token;
@@ -203,10 +205,10 @@ app.post("/api/users/expenseform", upload.single('img'), async (req, res) => {
     // Here, you'd query feedback data from your database based on the user ID
     // For demonstration, let's assume you have a Feedback model and you query the data
     // Replace the following line with your actual data retrieval logic
-    const feedbackData = await Feedback.find({ userId });
+    const ExpenseData = await Expense.find({ userId });
 
     // Respond with the feedback data
-    return res.json({ data: feedbackData, status: true });
+    return res.json({ data: ExpenseData, status: true });
   } catch (error) {
     // Log the error for debugging purposes
     console.error("Error while accessing feedback:", error);
@@ -223,9 +225,15 @@ app.get("/api/users/logout", (req, res) => {
   // Clear the JWT token by removing it from the client-side
   res.clearCookie("token"); // Clear the token cookie
 
+  // Clear any other cookies if needed
+  // res.clearCookie("cookieName");
+
+  // Clear any server-side session or state associated with the user
+  
   // Redirect the user to the login page after logout
   res.redirect("/");
 });
+
 
 
   
@@ -242,7 +250,7 @@ app.get("/api/users/logout", (req, res) => {
   app.get("/api/admin/view/userslist", async (req, res) => {
     try {
         // Fetch user details from the database
-        const userList = await UserDetails.find({});
+        const userList = await userDetails.find({});
         
         // Check if any users were found
         if (!userList || userList.length === 0) {
@@ -268,7 +276,7 @@ app.get("/api/users/logout", (req, res) => {
   
  
   //feedback via admin
-  app.get('/api/admin/view/feedback/:id', async (req, res) => {
+  app.get('/api/admin/view/expenseForm/:id', async (req, res) => {
     try {
       const { id } = req.params;
       const user = await userDetails.findById(id); // Assuming userDetails is your user model
@@ -281,32 +289,38 @@ app.get("/api/users/logout", (req, res) => {
   
       // Check if feedback exists
       if (feedbacks.length === 0) {
-        return res.status(404).json({ message: "No feedback found for the user", status: false });
+        return res.status(404).json({ message: "No expenses found for the user", status: false });
       }
   
-      res.json({ feedbacks, currUserName, status: true });
+      res.status(202).json({ feedbacks, currUserName, status: true });
     } catch (error) {
-      console.error("Error fetching feedback:", error);
-      res.status(500).json({ message: "Error fetching feedback", status: false });
+      console.error("Error fetching expenses:", error);
+      res.status(500).json({ message: "Error fetching expneses", status: false });
     }
   });
   
   
   //attendance via admin
-  app.get('api/admin/view/attendance/:id', async (req, res) => {
+  app.get('/api/admin/view/attendance/:id', async (req, res) => {
     try {
-      const { id } = req.params;
-      const user = await userDetails.findById(id); // Assuming userDetails is your user model
-      const currUserName = user.fullName;
-  
-      const worksession = await WorkSession.find({ userId: id }); // Assuming userId field is used to identify the user in the WorkSession model
-  
-      res.json({ worksession, currUserName , status: true});
+        const { id } = req.params;
+        const user = await userDetails.findById(id); // Assuming userDetails is your user model
+        
+        if (!user) {
+            // If no user is found with the provided ID
+            return res.status(404).json({ message: "User not found", status: false });
+        }
+        
+        const currUserName = user.fullName;
+        const worksession = await WorkSession.find({ userId: id }); // Assuming userId field is used to identify the user in the WorkSession model
+        
+        res.json({ worksession, currUserName , status: true});
     } catch (error) {
-      console.error("Error fetching work session:", error);
-      res.status(500).json({msg:"Error fetching work session", status: false});
+        console.error("Error fetching work session:", error);
+        res.status(500).json({ message: "Error fetching work session", status: false });
     }
-  });
+});
+
   
  
   
